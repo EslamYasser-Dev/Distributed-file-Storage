@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"strings"
@@ -21,20 +22,20 @@ func CASPathTransformFunc(key string) PathKey {
 		paths[i] = hashStr[from:to]
 	}
 	return PathKey{
-		Pathname: strings.Join(paths, "/"),
-		Filename: hashStr,
+		PathName: strings.Join(paths, "/"),
+		FileName: hashStr,
 	}
 }
 
 type PathTransformFunc func(string) PathKey
 
 type PathKey struct {
-	Pathname string
-	Filename string
+	PathName string
+	FileName string
 }
 
 func (p PathKey) FullPath() string {
-	return fmt.Sprintf("%s/%s", p.Pathname, p.Filename)
+	return fmt.Sprintf("%s/%s", p.PathName, p.FileName)
 }
 
 type StoreOpts struct {
@@ -54,14 +55,23 @@ func NewStore(opts StoreOpts) *Store {
 	}
 }
 
+func (s *Store) Has(key string) bool {
+	path := s.PathTransformFunc(key)
+	_, err := os.Stat(path.FullPath())
+	return err != fs.ErrNotExist
+}
+
 func (s *Store) ReadStream(key string) (io.Reader, error) {
 	pathKey := s.PathTransformFunc(key)
 	f, err := os.Open(pathKey.FullPath())
-
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 func (s *Store) writeStream(key string, r io.Reader) error {
 	pathKey := s.PathTransformFunc(key)
-	if err := os.MkdirAll(pathKey.Pathname, os.ModePerm); err != nil {
+	if err := os.MkdirAll(pathKey.PathName, os.ModePerm); err != nil {
 		return err
 	}
 	fullPath := pathKey.FullPath()

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -28,12 +30,18 @@ func CASPathTransformFunc(key string) PathKey {
 }
 
 type PathTransformFunc func(string) PathKey
-
 type PathKey struct {
 	PathName string
 	FileName string
 }
 
+func (p PathKey) FirstPathName() string {
+	paths := strings.Split(p.PathName, "/")
+	if len(paths) == 0 {
+		return ""
+	}
+	return paths[0]
+}
 func (p PathKey) FullPath() string {
 	return fmt.Sprintf("%s/%s", p.PathName, p.FileName)
 }
@@ -61,13 +69,35 @@ func (s *Store) Has(key string) bool {
 	return err != fs.ErrNotExist
 }
 
-func (s *Store) ReadStream(key string) (io.Reader, error) {
+func (s *Store) Delete(key string) error {
 	pathKey := s.PathTransformFunc(key)
-	f, err := os.Open(pathKey.FullPath())
+	defer func() {
+		log.Printf("deleted directory: [%s]", pathKey.FileName)
+	}()
+	// if err := os.RemoveAll(pathKey.FullPath()); err != nil {
+	// 	return err
+	// }
+	return os.RemoveAll(pathKey.FirstPathName())
+}
+
+func (s *Store) Read(key string) (io.Reader, error) {
+	f, err := s.ReadStream(key)
 	if err != nil {
 		return nil, err
 	}
-	return f, nil
+	// Type-assert f to io.Closer
+	closer, ok := f.(io.Closer)
+	if !ok {
+		return nil, errors.New("reader does not implement io.Closer")
+	}
+	defer closer.Close()
+	buff := new(bytes.Buffer)
+	_, err = io.Copy(buff, f)
+	return buff, err
+}
+func (s *Store) ReadStream(key string) (io.Reader, error) {
+	pathKey := s.PathTransformFunc(key)
+	return os.Open(pathKey.FullPath())
 }
 func (s *Store) writeStream(key string, r io.Reader) error {
 	pathKey := s.PathTransformFunc(key)

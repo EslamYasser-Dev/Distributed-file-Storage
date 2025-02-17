@@ -82,6 +82,10 @@ func (s *Store) Has(key string) bool {
 
 }
 
+func (s *Store) Clear() error {
+	return os.RemoveAll(s.Root)
+}
+
 func (s *Store) Delete(key string) error {
 	pathKey := s.PathTransformFunc(key)
 	firstPathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FirstPathName())
@@ -94,8 +98,11 @@ func (s *Store) Delete(key string) error {
 	return os.RemoveAll(firstPathNameWithRoot)
 }
 
+func (s *Store) Write(key string, r io.Reader) error {
+	return s.writeStream(key, r)
+}
 func (s *Store) Read(key string) (io.Reader, error) {
-	f, err := s.ReadStream(key)
+	f, err := s.readStream(key)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +116,7 @@ func (s *Store) Read(key string) (io.Reader, error) {
 	_, err = io.Copy(buff, f)
 	return buff, err
 }
-func (s *Store) ReadStream(key string) (io.Reader, error) {
+func (s *Store) readStream(key string) (io.Reader, error) {
 	pathKey := s.PathTransformFunc(key)
 	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
 	return os.Open(fullPathWithRoot)

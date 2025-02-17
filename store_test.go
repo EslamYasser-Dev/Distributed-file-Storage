@@ -7,20 +7,6 @@ import (
 	"testing"
 )
 
-func TestStroreDeleteKey(t *testing.T) {
-	opts := StoreOpts{
-		PathTransformFunc: CASPathTransformFunc,
-	}
-	s := NewStore(opts)
-	data := bytes.NewReader([]byte("hello deleted f"))
-	if err := s.writeStream("deletepic", data); err != nil {
-		t.Error(err)
-	}
-
-	if err := s.Delete("deletepic"); err != nil {
-		t.Error(err)
-	}
-}
 func TestPathTransformFunc(t *testing.T) {
 	key := "testpic"
 	pathKey := CASPathTransformFunc(key)
@@ -36,27 +22,42 @@ func TestPathTransformFunc(t *testing.T) {
 }
 
 func TestStore(t *testing.T) {
-	opts := StoreOpts{
+	s := newStore()
+	defer tearDown(t, s)
+	for i := 0; i < 100; i++ {
+		key := fmt.Sprintf("fooBar_%d", i)
+		data := []byte("some bytes of a file is here for test")
+		if err := s.Write(key, bytes.NewReader(data)); err != nil {
+			t.Error(err)
+		}
+
+		if ok := s.Has(key); !ok {
+			t.Errorf("expected to NOT have key: %s", key)
+		}
+
+		r, err := s.Read(key)
+		if err != nil {
+			t.Error(err)
+		}
+		b, _ := io.ReadAll(r)
+		if string(b) != string(data) {
+			t.Error(t, "store read test failed")
+		}
+		if err := s.Delete(key); err != nil {
+			t.Error(err)
+		}
+	}
+}
+
+// helper functions
+func newStore() *Store {
+	return NewStore(StoreOpts{
 		PathTransformFunc: CASPathTransformFunc,
-	}
-	key := "testpic"
-	s := NewStore(opts)
-	data := []byte("hello worldasdasdd f")
-	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
+	})
+}
+
+func tearDown(t *testing.T, s *Store) {
+	if err := s.Clear(); err != nil {
 		t.Error(err)
 	}
-
-	if ok := s.Has(key); !ok {
-		t.Errorf("expected to have key: %s", key)
-	}
-
-	f, err := s.Read(key)
-	if err != nil {
-		t.Error(err)
-	}
-	b, _ := io.ReadAll(f)
-	if string(b) != string(data) {
-		t.Error(t, "store read test failed")
-	}
-	s.Delete(key)
 }

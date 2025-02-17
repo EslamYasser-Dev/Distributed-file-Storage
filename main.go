@@ -1,36 +1,39 @@
 package main
 
 import (
+	"bytes"
 	"filestorage/p2p"
-	"fmt"
 	"log"
 )
 
-func onPeer(peer p2p.Peer) error {
-	peer.Close()
-	return nil
-}
-
-func main() {
-
-	tcpOpts := p2p.TCPTransportOpts{
-		ListenAddr:    ":5555",
+func makeServer(listenAddr string, nodes ...string) *FileServer {
+	tcpTransportOpts := p2p.TCPTransportOpts{
+		ListenAddr:    listenAddr,
 		HandShakeFunc: p2p.NOPHandShakeFunc,
 		Decoder:       p2p.DefualtDecoder{},
-		OnPeer:        onPeer,
-	}
-	tr := p2p.NewTCPTransport(tcpOpts)
 
+		//onPeerFunc
+	}
+	tcpTransport := p2p.NewTCPTransport(tcpTransportOpts)
+	opts := FileServerOpts{
+		StorageRoot:       (listenAddr + "_network"),
+		PathTransformFunc: CASPathTransformFunc,
+		Transport:         tcpTransport,
+		BootStrapNodes:    nodes,
+	}
+	server := NewFileServer(opts)
+	tcpTransport.OnPeer = server.OnPeer
+	return server
+}
+func main() {
+
+	s1 := makeServer(":3000", "")
+	s2 := makeServer(":4000", ":3000")
 	go func() {
-		for {
-			msg := <-tr.Consume()
-			fmt.Printf("msg : %+v\n", msg)
-		}
+		log.Fatal(s1.Start())
 	}()
 
-	if err := tr.ListenAndAccept(); err != nil {
-		log.Fatal(err)
-	}
-
-	select {}
+	s2.Start()
+	data := bytes.NewReader([]byte("imagine that is a big file"))
+	s2.StoreData("myData", data)
 }

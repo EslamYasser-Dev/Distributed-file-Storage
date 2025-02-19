@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"filestorage/p2p"
 	"log"
+	"time"
 )
 
 func makeServer(listenAddr string, nodes ...string) *FileServer {
@@ -11,7 +12,6 @@ func makeServer(listenAddr string, nodes ...string) *FileServer {
 		ListenAddr:    listenAddr,
 		HandShakeFunc: p2p.NOPHandShakeFunc,
 		Decoder:       p2p.DefualtDecoder{},
-
 		//onPeerFunc
 	}
 	tcpTransport := p2p.NewTCPTransport(tcpTransportOpts)
@@ -33,7 +33,12 @@ func main() {
 		log.Fatal(s1.Start())
 	}()
 
-	s2.Start()
+	time.Sleep(time.Second * 4)
+
+	go s2.Start()
+	time.Sleep(time.Second * 4)
+
 	data := bytes.NewReader([]byte("imagine that is a big file"))
 	s2.StoreData("myData", data)
+	select {}
 }

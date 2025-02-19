@@ -110,7 +110,7 @@ func (t *TCPTransport) handleConn(conn net.Conn, outBound bool) {
 		if err != nil {
 			return
 		}
-		rpc.From = conn.RemoteAddr()
+		rpc.From = conn.RemoteAddr().String()
 		t.rpcChan <- rpc
 	}
 }

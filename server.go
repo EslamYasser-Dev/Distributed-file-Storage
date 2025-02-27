@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 )
 
 type FileServerOpts struct {
@@ -50,6 +51,7 @@ func (s *FileServer) broadcast(msg *Message) error {
 	mw := io.MultiWriter(peers...)
 	return gob.NewEncoder(mw).Encode(msg)
 }
+
 func (s *FileServer) StoreData(key string, r io.Reader) error {
 	// buff := new(bytes.Buffer)
 
@@ -81,6 +83,7 @@ func (s *FileServer) StoreData(key string, r io.Reader) error {
 			return err
 		}
 	}
+	time.Sleep(time.Second * 3)
 	payload := []byte("large file")
 	for _, peer := range s.peers {
 		if err := peer.Send(payload); err != nil {
@@ -112,6 +115,8 @@ func (s *FileServer) loop() {
 			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
 				log.Fatal(err)
 			}
+			fmt.Printf("recv Message : %s", string(msg.Payload.([]byte)))
+
 			peer, ok := s.peers[rpc.From]
 			if !ok {
 				panic("peer not found")
@@ -120,11 +125,12 @@ func (s *FileServer) loop() {
 			if _, err := peer.Read(b); err != nil {
 				panic(err)
 			}
-			panic("err ")
-			fmt.Printf("recv Message : %s", string(msg.Payload.([]byte)))
+			fmt.Printf("%s\n", string(b))
+
 			// if err := s.handleMessage(&m); err != nil {
 			// 	log.Println("hand le message error", err)
 			// }
+			peer.(*p2p.TCPPeer).Wg.Done()
 		case <-s.quitch:
 			return
 		}

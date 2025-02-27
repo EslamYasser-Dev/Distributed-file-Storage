@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 )
 
 type TCPPeer struct {
@@ -12,12 +13,15 @@ type TCPPeer struct {
 	// if we dial and retreive connection => outbound == true
 	//if accept and retrive connection  => outbound == false
 	outBound bool
+
+	Wg *sync.WaitGroup
 }
 
 func NewTCPPeer(conn net.Conn, outBound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
 		outBound: outBound,
+		Wg:       &sync.WaitGroup{},
 	}
 }
 
@@ -111,6 +115,10 @@ func (t *TCPTransport) handleConn(conn net.Conn, outBound bool) {
 			return
 		}
 		rpc.From = conn.RemoteAddr().String()
+		peer.Wg.Add(1)
+		fmt.Println("wait until the stream is done....")
 		t.rpcChan <- rpc
+		peer.Wg.Wait()
+		fmt.Println("stream done, back to read another ....")
 	}
 }
